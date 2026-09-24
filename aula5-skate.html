@@ -59,7 +59,7 @@
 
   <canvas id="game" width="900" height="500"></canvas>
 
-  <div id="hint">← → trocar de pista · desvie dos cones e da barraca de pastel (não dá pra pular!) · junte moedas 🛹</div>
+  <div id="hint">← → trocar de pista · ↑/ESPAÇO pula o cone · a barraca de pastel só desviando · junte moedas 🛹</div>
 
   <div id="overlay">
     <h2 id="overlayTitle">🏁 CHEGOU!</h2>
@@ -124,9 +124,10 @@ function buildCoins() {
 buildCoins();
 
 // ---------- Obstáculos ----------
-// Cones (pequenos, desviáveis por qualquer lado) e a barraca de
-// pastel (obstáculo maior). Nunca dois obstáculos na mesma pista
-// no mesmo trecho — sempre sobra pelo menos uma pista livre.
+// Cones (pequenos, dá pra pular por cima) e a barraca de pastel
+// (obstáculo maior, só escapa trocando de pista). Nunca dois
+// obstáculos na mesma pista no mesmo trecho — sempre sobra pelo
+// menos uma pista livre.
 let obstacles = [];
 function shuffleLanes(seed) {
   const lanes = [0, 1, 2];
@@ -198,11 +199,14 @@ function update(dt) {
     }
   }
 
-  // colisão com obstáculo: pular NÃO ajuda, só trocar de pista escapa
+  // colisão com obstáculo: cone dá pra pular por cima, barraca de
+  // pastel é grande demais pra saltar — só escapa trocando de pista
+  const CONE_CLEAR_HEIGHT = 34; // altura de salto que já livra o cone
   for (const o of obstacles) {
     if (o.hit) continue;
     const d = o.d - distance;
     if (d < 1.0 && d > -1.0 && Math.abs(player.lane - o.lane) < 0.55) {
+      if (o.type === 'cone' && player.jumpY > CONE_CLEAR_HEIGHT) continue;
       o.hit = true;
       crashGame(o.type);
     }
