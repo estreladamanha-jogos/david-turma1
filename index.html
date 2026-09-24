@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Área de trabalho do David</title>
+  <style>
+    :root {
+      --fundo: #1e2a47;
+      --cartao: #2c3b63;
+      --texto: #f5f7ff;
+      --destaque: #ffcc4d;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: var(--fundo);
+      color: var(--texto);
+      line-height: 1.5;
+      padding: 16px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+    }
+
+    .relogio {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: var(--destaque);
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    /* Ícones da área de trabalho */
+    .icones {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .icone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 16px 8px;
+      background: var(--cartao);
+      border-radius: 12px;
+      color: var(--texto);
+      text-decoration: none;
+      transition: transform 0.15s;
+    }
+
+    .icone:hover,
+    .icone:focus {
+      transform: scale(1.05);
+      outline: 2px solid var(--destaque);
+    }
+
+    .icone-emoji {
+      font-size: 2rem;
+    }
+
+    .bloco {
+      background: var(--cartao);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .bloco h2 {
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+      color: var(--destaque);
+    }
+
+    .bloco ul {
+      padding-left: 20px;
+    }
+
+    .bloco a {
+      color: var(--texto);
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 32px;
+      font-size: 0.9rem;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Área de trabalho do David</h1>
+    <p class="relogio" id="relogio">--:--</p>
+  </header>
+
+  <main>
+    <nav class="icones" aria-label="Atalhos">
+      <a class="icone" href="#projetos">
+        <span class="icone-emoji">📁</span>
+        <span>Projetos</span>
+      </a>
+      <a class="icone" href="#anotacoes">
+        <span class="icone-emoji">📝</span>
+        <span>Anotações</span>
+      </a>
+      <a class="icone" href="#links">
+        <span class="icone-emoji">🔗</span>
+        <span>Links</span>
+      </a>
+      <a class="icone" href="#metas">
+        <span class="icone-emoji">🎯</span>
+        <span>Metas</span>
+      </a>
+    </nav>
+
+    <section class="bloco" id="projetos">
+      <h2>📁 Projetos</h2>
+      <ul>
+        <li>Meu primeiro site (esta página!)</li>
+      </ul>
+    </section>
+
+    <section class="bloco" id="anotacoes">
+      <h2>📝 Anotações</h2>
+      <p>Escreva aqui o que aprendeu hoje.</p>
+    </section>
+
+    <section class="bloco" id="links">
+      <h2>🔗 Links úteis</h2>
+      <ul>
+        <li><a href="https://developer.mozilla.org/pt-BR/docs/Learn" target="_blank">Aprender HTML e CSS (MDN)</a></li>
+        <li><a href="https://claude.ai" target="_blank">Claude</a></li>
+      </ul>
+    </section>
+
+    <section class="bloco" id="metas">
+      <h2>🎯 Metas</h2>
+      <ul>
+        <li>Aprender a mudar as cores desta página</li>
+        <li>Adicionar um projeto novo</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>Feito pelo David · Turma 1</p>
+  </footer>
+
+  <script>
+    // Atualiza o relógio a cada segundo
+    function atualizarRelogio() {
+      const agora = new Date();
+      document.getElementById("relogio").textContent =
+        agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    }
+    atualizarRelogio();
+    setInterval(atualizarRelogio, 1000);
+  </script>
+</body>
+</html>
