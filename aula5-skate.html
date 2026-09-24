@@ -35,6 +35,10 @@
   }
   #touch { position:absolute; inset:0; z-index:4; display:flex; }
   #touch .zona { flex:1; }
+  #lives {
+    position:absolute; top:44px; left:14px; z-index:6; font-size:20px;
+    letter-spacing:2px; text-shadow:2px 2px 0 #000; pointer-events:none;
+  }
   #overlay {
     position:absolute; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:16px;
     background:rgba(20,10,40,.85); border-radius:8px; z-index:10; text-align:center; padding:20px;
@@ -61,8 +65,9 @@
 
   <canvas id="game" width="900" height="500"></canvas>
   <div id="touch"><div class="zona" id="zonaEsq"></div><div class="zona" id="zonaPular"></div><div class="zona" id="zonaDir"></div></div>
+  <div id="lives">❤️❤️❤️</div>
 
-  <div id="hint">← → trocar de pista · ↑/ESPAÇO pula o cone · a barraca de pastel só desviando · junte moedas 🛹</div>
+  <div id="hint">← → trocar de pista · ↑/ESPAÇO pula o cone · a barraca de pastel só desviando · 3 vidas ❤️ · junte moedas 🛹</div>
 
   <div id="overlay">
     <h2 id="overlayTitle">🏁 CHEGOU!</h2>
@@ -101,6 +106,17 @@ let distance = 0;
 let time = 0;
 let gameOver = false;
 let coinCount = 0;
+
+// ---------- Vidas ----------
+const MAX_LIVES = 3;
+let lives = MAX_LIVES;
+let invincible = false;
+let invincibleTimer = 0;
+const INVINCIBLE_TIME = 1.5; // segundos de invencibilidade após bater
+
+function updateLivesUI() {
+  document.getElementById('lives').textContent = '❤️'.repeat(lives) + '🤍'.repeat(MAX_LIVES - lives);
+}
 
 // ---------- Perspectiva ----------
 function sc(d) { return FOCAL / (FOCAL + Math.max(d, -FOCAL*0.6)); }
@@ -199,6 +215,11 @@ function update(dt) {
     if (player.jumpY <= 0) { player.jumpY = 0; player.vy = 0; player.onGround = true; }
   }
 
+  if (invincible) {
+    invincibleTimer -= dt;
+    if (invincibleTimer <= 0) { invincible = false; invincibleTimer = 0; }
+  }
+
   for (const c of coins) {
     if (c.taken) continue;
     const d = c.d - distance;
@@ -212,13 +233,16 @@ function update(dt) {
   // colisão com obstáculo: cone dá pra pular por cima, barraca de
   // pastel é grande demais pra saltar — só escapa trocando de pista
   const CONE_CLEAR_HEIGHT = 34; // altura de salto que já livra o cone
-  for (const o of obstacles) {
-    if (o.hit) continue;
-    const d = o.d - distance;
-    if (d < 1.0 && d > -1.0 && Math.abs(player.lane - o.lane) < 0.55) {
-      if (o.type === 'cone' && player.jumpY > CONE_CLEAR_HEIGHT) continue;
-      o.hit = true;
-      crashGame(o.type);
+  if (!invincible) {
+    for (const o of obstacles) {
+      if (o.hit) continue;
+      const d = o.d - distance;
+      if (d < 1.0 && d > -1.0 && Math.abs(player.lane - o.lane) < 0.55) {
+        if (o.type === 'cone' && player.jumpY > CONE_CLEAR_HEIGHT) continue;
+        o.hit = true; // obstáculo some ao ser atingido
+        loseLife();
+        break; // só perde 1 vida por vez, mesmo se dois obstáculos coincidirem
+      }
     }
   }
 
@@ -236,12 +260,22 @@ function winGame() {
   document.getElementById('overlay').classList.add('show');
 }
 
-function crashGame(tipo) {
+function loseLife() {
+  lives--;
+  updateLivesUI();
+  if (lives <= 0) {
+    crashGame();
+  } else {
+    invincible = true;
+    invincibleTimer = INVINCIBLE_TIME;
+  }
+}
+
+function crashGame() {
   gameOver = true;
-  const nome = tipo === 'pastel' ? 'na barraca de pastel 🥟' : 'num cone 🚧';
-  document.getElementById('overlayTitle').textContent = '💥 ESBARROU!';
+  document.getElementById('overlayTitle').textContent = '💥 GAME OVER!';
   document.getElementById('overlayText').textContent =
-    `Você bateu ${nome} depois de ${Math.floor(distance)}m e ${coinCount} moedas. Troque de pista mais rápido!`;
+    `Suas 3 vidas acabaram depois de ${Math.floor(distance)}m e ${coinCount} moedas. Troque de pista mais rápido!`;
   document.getElementById('overlay').classList.add('show');
 }
 
@@ -250,11 +284,14 @@ function restart() {
   distance = 0; time = 0;
   coinCount = 0;
   gameOver = false;
+  lives = MAX_LIVES;
+  invincible = false; invincibleTimer = 0;
   player.lane = player.targetLane = 1;
   player.jumpY = 0; player.vy = 0; player.onGround = true;
   buildCoins();
   buildObstacles();
   document.getElementById('coinVal').textContent = 0;
+  updateLivesUI();
   document.getElementById('overlay').classList.remove('show');
 }
 
@@ -547,6 +584,7 @@ function drawPastelStand(o) {
 }
 
 function drawObstacle(o) {
+  if (o.hit) return; // some da tela ao ser atingido
   if (o.type === 'pastel') drawPastelStand(o);
   else drawCone(o);
 }
@@ -575,6 +613,9 @@ function drawFinish() {
 }
 
 function drawPlayer() {
+  // pisca enquanto invencível: alterna sumir/aparecer ~8x por segundo
+  if (invincible && Math.floor(time * 16) % 2 === 0) return;
+
   const x = laneX(player.lane, 0);
   const jy = player.jumpY;
   const bob = player.onGround ? Math.sin(time*16) * 1.6 : 0;
