@@ -136,6 +136,12 @@ const MUNDOS = [
 let mundoIdx = 0;
 let anel = null;                // { y, alvo } — anel brilhante que sobe até o jogador
 let flashT = 0, nomeT = 0, nomeTxt = '';
+
+/* ---------- poderes: dash (espaço) e fogo (F) ---------- */
+const DASH_DUR = .25, DASH_CD = 2.5, DASH_SPEED = 620;
+const FOGO_DUR = 4, FOGO_CD = 6;
+let dashT = 0, dashCD = 0, dashDir = 1;
+let fogoT = 0, fogoCD = 0, avisoT = 0;
 let clima = [], naves = [], climaSpawnT = .3;
 const estrelas = Array.from({ length: 70 }, () => ({ x: rnd(0, W), y: rnd(0, H * 3), r: rnd(.6, 2), tw: rnd(0, 6.28) }));
 
@@ -434,6 +440,47 @@ function desenharObstaculo(o) {
   c.restore();
 }
 
+/* ---------- poderes: chama, ícones e aviso ---------- */
+function desenharChama() {
+  if (fogoT <= 0) return;
+  const x = jog.x + jog.dir * 26, y = PY + 6;
+  for (let i = 0; i < 3; i++) {
+    const fl = Math.sin(t * 20 + i) * 4;
+    const g = c.createRadialGradient(x, y, 0, x, y, 18 - i * 4);
+    g.addColorStop(0, '#fff4c0'); g.addColorStop(.5, '#ff8a3c'); g.addColorStop(1, 'rgba(255,80,20,0)');
+    c.fillStyle = g;
+    c.beginPath(); c.ellipse(x + fl, y - i * 6, 14 - i * 3, 20 - i * 4, 0, 0, 7); c.fill();
+  }
+}
+function desenharIconePoder(x, y, r, cd, cdMax, cor, emoji) {
+  c.save();
+  c.beginPath(); c.arc(x, y, r, 0, 7); c.fillStyle = 'rgba(10,10,25,.55)'; c.fill();
+  c.strokeStyle = cor; c.lineWidth = 3; c.stroke();
+  c.font = `${r}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.globalAlpha = cd > 0 ? .4 : 1;
+  c.fillText(emoji, x, y + 2);
+  c.globalAlpha = 1;
+  if (cd > 0) {
+    const p = clamp(cd / cdMax, 0, 1);
+    c.beginPath(); c.moveTo(x, y);
+    c.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + p * 6.283);
+    c.closePath();
+    c.fillStyle = 'rgba(0,0,0,.55)'; c.fill();
+  }
+  c.restore();
+}
+function desenharPoderes() {
+  if (estado !== 'jogando') return;
+  desenharIconePoder(56, H - 34, 22, dashCD, DASH_CD, '#bfe8ff', '💨');
+  desenharIconePoder(W - 56, H - 34, 22, fogoCD, FOGO_CD, '#ffb066', '🔥');
+}
+function desenharAviso() {
+  if (avisoT <= 0) return;
+  c.save(); c.globalAlpha = clamp(avisoT / 1.8, 0, 1);
+  texto('O FOGO NÃO FUNCIONA AQUI!', W / 2, H - 92, 10, '#ff6b6b');
+  c.restore();
+}
+
 /* ---------- partículas ---------- */
 function burst(x, y, cor, n, v) {
   for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, s = rnd(30, v || 140); fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(.3, .7), max: .7, cor, r: rnd(1.5, 3.6) }); }
@@ -442,10 +489,20 @@ function burst(x, y, cor, n, v) {
 /* ---------- entrada ---------- */
 addEventListener('keydown', e => {
   const k = e.code;
-  if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab'].includes(k)) e.preventDefault();
+  if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'KeyF'].includes(k)) e.preventDefault();
   if (estado !== 'jogando') { if (k === 'Space' || k === 'Enter' || k === 'KeyR') resetar(); return; }
   if (k === 'ArrowLeft' || k === 'KeyA') keys.left = true;
   if (k === 'ArrowRight' || k === 'KeyD') keys.right = true;
+  if (k === 'Space' && dashCD <= 0 && dashT <= 0) {
+    dashDir = jog.dir || 1;
+    dashT = DASH_DUR; dashCD = DASH_CD;
+  }
+  if (k === 'KeyF' && fogoCD <= 0 && fogoT <= 0) {
+    fogoCD = FOGO_CD;
+    const tipoAtual = MUNDOS[mundoIdx].tipo;
+    if (tipoAtual === 'floresta' || tipoAtual === 'geleira') fogoT = FOGO_DUR;
+    else avisoT = 1.8;
+  }
 });
 addEventListener('keyup', e => {
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
@@ -456,6 +513,7 @@ function resetar() {
   estado = 'jogando'; t = 0; dist = 0; vidas = 3; invenc = 0; cristais = 0; shake = 0;
   jog.x = W / 2; jog.vx = 0; obst = []; gems = []; fx = []; spawnT = 1; gemT = 1;
   mundoIdx = 0; anel = null; flashT = 0; nomeT = 0; clima = []; naves = []; climaSpawnT = .3;
+  dashT = 0; dashCD = 0; dashDir = 1; fogoT = 0; fogoCD = 0; avisoT = 0;
 }
 
 /* ---------- atualização ---------- */
@@ -484,11 +542,35 @@ function update(dt) {
   if (nomeT > 0) nomeT -= dt;
   atualizarClima(dt);
 
+  // ---- poderes: dash (espaço) e fogo (F) ----
+  if (dashCD > 0) dashCD -= dt;
+  if (fogoCD > 0) fogoCD -= dt;
+  if (avisoT > 0) avisoT -= dt;
+  if (dashT > 0) dashT -= dt;
+  if (fogoT > 0) {
+    fogoT -= dt;
+    const tipoAtual = MUNDOS[mundoIdx].tipo;
+    if (tipoAtual === 'floresta' || tipoAtual === 'geleira') {
+      for (const o of obst) {
+        if (o.morto) continue;
+        const dx = o.x - jog.x, dy = o.y - PY;
+        if (Math.abs(dx) < 60 && Math.abs(dy) < 70) {
+          if (tipoAtual === 'floresta' && o.sd < .5) { o.morto = true; burst(o.x, o.y, '#ff8a3c', 10, 100); }
+          else if (tipoAtual === 'geleira') { o.morto = true; burst(o.x, o.y, '#bfefff', 10, 90); }
+        }
+      }
+    }
+  }
+
   // ---- movimento do Fagulha ----
-  const ax = (keys.left ? -1 : 0) + (keys.right ? 1 : 0);
-  if (ax) jog.dir = ax;
-  jog.vx += (ax * 300 - jog.vx) * Math.min(1, dt * 10);
-  jog.x = clamp(jog.x + jog.vx * dt, 34, W - 34);
+  if (dashT > 0) {
+    jog.x = clamp(jog.x + dashDir * DASH_SPEED * dt, 34, W - 34);
+  } else {
+    const ax = (keys.left ? -1 : 0) + (keys.right ? 1 : 0);
+    if (ax) jog.dir = ax;
+    jog.vx += (ax * 300 - jog.vx) * Math.min(1, dt * 10);
+    jog.x = clamp(jog.x + jog.vx * dt, 34, W - 34);
+  }
 
   // ---- obstáculos ----
   spawnT -= dt;
@@ -517,7 +599,7 @@ function update(dt) {
     if (o.morto) continue;
     const ox = o.x - o.w * .42, oy = o.y - o.h * .42, ow = o.w * .84, oh = o.h * .84;
     if (hb.x < ox + ow && hb.x + hb.w > ox && hb.y < oy + oh && hb.y + hb.h > oy) {
-      if (imune || invenc > 0) continue;
+      if (imune || invenc > 0 || dashT > 0) continue;
       levarDano(o);
       break;
     }
@@ -580,12 +662,15 @@ function desenhar() {
       vx: clamp(jog.vx / 300, -1, 1), hit: invenc > 1.2,
       alpha: piscando ? .3 : 1 });
   }
+  desenharChama();
   for (const p of fx) { c.globalAlpha = clamp(p.life / p.max, 0, 1); c.fillStyle = p.cor; c.beginPath(); c.arc(p.x, p.y, p.r, 0, 7); c.fill(); }
   c.globalAlpha = 1;
   c.restore();
   hud();
   desenharNomeMundo();
   desenharFlash();
+  desenharPoderes();
+  desenharAviso();
   telas();
 }
 
