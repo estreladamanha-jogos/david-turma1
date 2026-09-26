@@ -114,7 +114,7 @@ if (!c.roundRect) c.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); }
 const W = 420, H = 640;
 const PY = 190;                 // altura fixa do Fagulha na tela (o cenário é que sobe)
 const BASE_V = 230;             // velocidade da queda (pixels por segundo)
-const META = 1000;
+const META = 1250;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
 
@@ -132,7 +132,9 @@ const MUNDOS = [
   { nome: 'GELEIRA', tipo: 'geleira', ceu: ['#eaf6ff', '#8fc7e8', '#0d2438'], anel: '#a0d8ff' },
   { nome: 'VULCÃO', tipo: 'vulcao', ceu: ['#ffdca0', '#ff7a3c', '#3a0d05'], anel: '#ff8a4c' },
   { nome: 'ESPAÇO', tipo: 'espaco', ceu: ['#e4d4ff', '#8a5fd6', '#140a2e'], anel: '#c9a0ff' },
+  { nome: '8-BIT', tipo: 'retro8bit', ceu: ['#101020', '#101020', '#101020'], anel: '#f6f6f6' },
 ];
+const RETRO_PAL = ['#101020', '#f6f6f6', '#e8433b', '#38c8e0'];
 let mundoIdx = 0;
 let anel = null;                // { y, alvo } — anel brilhante que sobe até o jogador
 let flashT = 0, nomeT = 0, nomeTxt = '';
@@ -141,10 +143,12 @@ let flashT = 0, nomeT = 0, nomeTxt = '';
 const DASH_DUR = .25, DASH_CD = 2.5, DASH_SPEED = 620;
 const FOGO_DUR = 4, FOGO_CD = 6;
 const ESCUDO_DUR = 5, ESCUDO_CD = 8;
-let poderSel = 0; // 0 dash, 1 fogo, 2 escudo
+const REBOBINAR_CD = 15, REBOBINAR_JANELA = 3, GLITCH_DUR = .6;
+let poderSel = 0; // 0 dash, 1 fogo, 2 escudo, 3 rebobinar
 let dashT = 0, dashCD = 0, dashDir = 1;
 let fogoT = 0, fogoCD = 0, avisoT = 0;
 let escudoAtivo = false, escudoT = 0, escudoCD = 0;
+let rebobinarCD = 0, glitchT = 0, historico = [];
 let clima = [], naves = [], climaSpawnT = .3;
 const estrelas = Array.from({ length: 70 }, () => ({ x: rnd(0, W), y: rnd(0, H * 3), r: rnd(.6, 2), tw: rnd(0, 6.28) }));
 
@@ -251,6 +255,57 @@ function desenharVulcaoFundo() {
       rochaVulcanica(W - 16 - seedD * 24, baseY, camada);
     }
   });
+}
+
+/* ----- retro 8-bit: pixels grandes, só 4 cores ----- */
+function desenharRetroFundo() {
+  c.fillStyle = RETRO_PAL[0];
+  c.fillRect(0, 0, W, H);
+  const camadas = [
+    { velRel: .5, cor: RETRO_PAL[2], tam: 28 },
+    { velRel: 1, cor: RETRO_PAL[3], tam: 24 },
+  ];
+  camadas.forEach((cm, ci) => {
+    const passo = cm.tam * 5;
+    const offset = (dist * cm.velRel) % passo;
+    for (let i = -1; i < 9; i++) {
+      const baseY = i * passo - offset + passo;
+      c.fillStyle = cm.cor;
+      c.fillRect(0, baseY, cm.tam * 2, cm.tam);
+      c.fillRect(W - cm.tam * 2, baseY, cm.tam * 2, cm.tam);
+    }
+  });
+  c.fillStyle = RETRO_PAL[1];
+  for (let i = 0; i < 6; i++) {
+    const sx = (i * 70 + 20) % W;
+    let sy = (i * 130 - dist * .3) % H;
+    if (sy < 0) sy += H;
+    c.fillRect(sx, sy, 10, 10);
+  }
+}
+const RETRO_MATRIZ = [
+  [0, 1, 1, 1, 0],
+  [1, 1, 1, 1, 1],
+  [1, 1, 1, 1, 1],
+  [1, 0, 1, 0, 1],
+  [1, 1, 1, 1, 1],
+  [0, 1, 1, 1, 0],
+];
+function desenharPixelBloco(o) {
+  const cols = RETRO_MATRIZ[0].length, rows = RETRO_MATRIZ.length;
+  const px = Math.min(o.w / cols, o.h / rows);
+  const totW = px * cols, totH = px * rows;
+  const cor = o.sd < .5 ? RETRO_PAL[2] : RETRO_PAL[3];
+  for (let ry = 0; ry < rows; ry++) {
+    for (let rx = 0; rx < cols; rx++) {
+      if (RETRO_MATRIZ[ry][rx]) {
+        c.fillStyle = cor;
+        c.fillRect(-totW / 2 + rx * px, -totH / 2 + ry * px, px, px);
+      }
+    }
+  }
+  c.strokeStyle = RETRO_PAL[0]; c.lineWidth = 2;
+  c.strokeRect(-totW / 2, -totH / 2, totW, totH);
 }
 
 /* ----- espaço: estrelas no fundo ----- */
@@ -439,7 +494,8 @@ function desenharObstaculo(o) {
   if (tipo === 'floresta') { if (o.sd < .5) desenharCogumelo(o); else desenharGalhoEspinhos(o); }
   else if (tipo === 'geleira') desenharEspinhoGelo(o);
   else if (tipo === 'vulcao') desenharMagma(o);
-  else desenharAlien(o);
+  else if (tipo === 'espaco') desenharAlien(o);
+  else desenharPixelBloco(o);
   c.restore();
 }
 
@@ -479,8 +535,9 @@ function desenharPoderes() {
     { cd: dashCD, max: DASH_CD, cor: '#bfe8ff', emoji: '💨' },
     { cd: fogoCD, max: FOGO_CD, cor: '#ffb066', emoji: '🔥' },
     { cd: escudoCD, max: ESCUDO_CD, cor: '#7CFF9E', emoji: '🛡️' },
+    { cd: rebobinarCD, max: REBOBINAR_CD, cor: '#ffe066', emoji: '⏪' },
   ];
-  const cx0 = W / 2 - 60, passo = 60;
+  const cx0 = W / 2 - 90, passo = 60;
   specs.forEach((s, i) => desenharIconePoder(cx0 + i * passo, H - 34, 20, s.cd, s.max, s.cor, s.emoji, i === poderSel));
 }
 function desenharEscudo() {
@@ -500,6 +557,18 @@ function desenharAviso() {
   texto('O FOGO NÃO FUNCIONA AQUI!', W / 2, H - 92, 10, '#ff6b6b');
   c.restore();
 }
+function desenharGlitch() {
+  if (glitchT <= 0) return;
+  const forca = glitchT / GLITCH_DUR;
+  c.save();
+  for (let i = 0; i < 14; i++) {
+    const y = rnd(0, H), h = rnd(2, 8);
+    c.globalAlpha = .5 * forca;
+    c.fillStyle = Math.random() < .5 ? '#7CFF9E' : '#fff';
+    c.fillRect(0, y, W, h);
+  }
+  c.restore();
+}
 
 /* ---------- partículas ---------- */
 function burst(x, y, cor, n, v) {
@@ -513,7 +582,7 @@ addEventListener('keydown', e => {
   if (estado !== 'jogando') { if (k === 'Space' || k === 'Enter' || k === 'KeyR') resetar(); return; }
   if (k === 'ArrowLeft' || k === 'KeyA') keys.left = true;
   if (k === 'ArrowRight' || k === 'KeyD') keys.right = true;
-  if (k === 'KeyQ') poderSel = (poderSel + 1) % 3;
+  if (k === 'KeyQ') poderSel = (poderSel + 1) % 4;
   if (k === 'Space') {
     if (poderSel === 0 && dashCD <= 0 && dashT <= 0) {
       dashDir = jog.dir || 1;
@@ -525,6 +594,16 @@ addEventListener('keydown', e => {
       else avisoT = 1.8;
     } else if (poderSel === 2 && escudoCD <= 0 && !escudoAtivo) {
       escudoAtivo = true; escudoT = ESCUDO_DUR; escudoCD = ESCUDO_CD;
+    } else if (poderSel === 3 && rebobinarCD <= 0) {
+      const alvo = t - REBOBINAR_JANELA;
+      let snap = historico[0];
+      for (const h of historico) { if (h.t <= alvo) snap = h; else break; }
+      if (snap) {
+        dist = snap.dist; jog.x = snap.x; vidas = Math.max(vidas, snap.vidas);
+        mundoIdx = Math.min(MUNDOS.length - 1, Math.floor(dist / 2500));
+        anel = null;
+      }
+      rebobinarCD = REBOBINAR_CD; glitchT = GLITCH_DUR;
     }
   }
 });
@@ -539,6 +618,7 @@ function resetar() {
   mundoIdx = 0; anel = null; flashT = 0; nomeT = 0; clima = []; naves = []; climaSpawnT = .3;
   poderSel = 0; dashT = 0; dashCD = 0; dashDir = 1; fogoT = 0; fogoCD = 0; avisoT = 0;
   escudoAtivo = false; escudoT = 0; escudoCD = 0;
+  rebobinarCD = 0; glitchT = 0; historico = [];
 }
 
 /* ---------- atualização ---------- */
@@ -549,6 +629,10 @@ function update(dt) {
   dist += vel * dt;
   if (invenc > 0) invenc -= dt;
   if (shake > 0) shake -= dt;
+
+  // ---- histórico para o rebobinar ----
+  historico.push({ t, dist, x: jog.x, vidas });
+  while (historico.length && t - historico[0].t > REBOBINAR_JANELA + .5) historico.shift();
 
   // ---- anel brilhante: sobe até o Fagulha e só então troca o mundo ----
   if (!anel && mundoIdx < MUNDOS.length - 1 && dist >= (mundoIdx + 1) * 2500) {
@@ -571,6 +655,8 @@ function update(dt) {
   if (dashCD > 0) dashCD -= dt;
   if (fogoCD > 0) fogoCD -= dt;
   if (escudoCD > 0) escudoCD -= dt;
+  if (rebobinarCD > 0) rebobinarCD -= dt;
+  if (glitchT > 0) glitchT -= dt;
   if (avisoT > 0) avisoT -= dt;
   if (dashT > 0) dashT -= dt;
   if (escudoAtivo) {
@@ -653,6 +739,7 @@ function levarDano(o) {
 /* ---------- desenho ---------- */
 function fundo() {
   const m = MUNDOS[mundoIdx];
+  if (m.tipo === 'retro8bit') { desenharRetroFundo(); return; }
   const g = c.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, m.ceu[0]); g.addColorStop(.45, m.ceu[1]); g.addColorStop(1, m.ceu[2]);
   c.fillStyle = g; c.fillRect(0, 0, W, H);
@@ -703,6 +790,7 @@ function desenhar() {
   desenharFlash();
   desenharPoderes();
   desenharAviso();
+  desenharGlitch();
   telas();
 }
 
