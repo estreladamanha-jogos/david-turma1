@@ -462,8 +462,8 @@ function update(dt) {
 }
 
 function levarDano(o) {
-  if (o && o.tp === 'gelo') { lentoT = 2; o.morto = true; burst(o.x, o.y, '#bfefff', 14, 140); return; }
   if (escudoT > 0) { escudoT = 0; invenc = .6; burst(jog.x, PY, '#7CFF9E', 22, 200); if (o) o.morto = true; return; }
+  if (o && o.tp === 'gelo') { lentoT = 2; burst(o.x, o.y, '#bfefff', 14, 140); }
   vidas--; invenc = PISCAR; shake = .3; burst(jog.x, PY, '#ff5577', 16, 180);
   if (o) o.morto = true;
   if (vidas === 0) { estado = 'gameover'; mortes++; }
