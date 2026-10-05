@@ -494,7 +494,7 @@ function atualizarBoss(dt) {
     if (b.armor <= 0) { b.fase = 'nucleo'; bannerT = 2; }
   }
   // dash bate no núcleo exposto; encostar sem dash machuca o Fagulha
-  const toca = Math.abs(b.x - jog.x) < b.w / 2 + 12 && b.y - b.h / 2 < PY + 34;
+  const toca = Math.abs(b.x - jog.x) < b.w / 2 + 12 && (b.fase === 'nucleo' ? b.y < PY + 300 : b.y - b.h / 2 < PY + 34);
   if (toca) {
     if (b.fase === 'nucleo' && dashT > 0 && b.stun <= 0) {
       b.core--; b.stun = 1.2; b.flash = .6; shake = .25; burst(b.x, b.y, '#ff5aa0', 26, 240);
