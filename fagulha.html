@@ -445,7 +445,7 @@ function update(dt) {
   const imune = dashT > 0;
   for (const o of obst) {
     if (o.morto) continue;
-    const kk = o.tp === 'lava' ? .95 : .42; const ox = o.x - o.w * kk, oy = o.y - o.h * kk, ow = o.w * 2 * kk, oh = o.h * 2 * kk;
+    const kk = o.tp === 'lava' ? .5 : .4; const ox = o.x - o.w * kk, oy = o.y - o.h * kk, ow = o.w * 2 * kk, oh = o.h * 2 * kk;
     if (hb.x < ox + ow && hb.x + hb.w > ox && hb.y < oy + oh && hb.y + hb.h > oy) {
       if (imune || invenc > 0) continue;
       levarDano(o);
